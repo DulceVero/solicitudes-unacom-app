@@ -150,7 +150,7 @@ if "usuario_actual" not in st.session_state:
 
 # --- FUNCIÓN DE LOGIN ---
 def pantalla_login():
-    st.title("🔐 Control de Movimientos de Plantilla")
+    st.title("Movimientos en Plantillas de Personal")
     st.markdown("Ingrese sus credenciales para acceder al módulo correspondiente a su perfil.")
     
     col1, col2, col3 = st.columns([1, 1.5, 1])
@@ -172,7 +172,7 @@ def pantalla_login():
             st.markdown("""
             **Usuarios Solicitantes (Solo Formulario):**
             - Usuario: `utl_user` | Contraseña: `123` *(Solo ve áreas vinculadas a UTL)*
-            - Usuario: `solicitante_general` | Contraseña: `123` *(Ve las 3 áreas)*
+            - Usuario: `solicitante_general` | Contraseña: `123` *(Ve las 3 áreas)* 
             
             **Responsables de Área (Bandeja + Gráficas):**
             - Talento Humano: `resp_th` | Contraseña: `admin`
@@ -186,7 +186,6 @@ def vista_solicitante(datos_usuario):
     st.info(f"Conectado como: **{datos_usuario['nombre']}** | Adscripción: **{datos_usuario['area_origen']}**")
     
     # Paso 1: Selección del tipo de solicitud (FUERA del form para reactividad inmediata)
-    st.subheader("1. Seleccione el Tipo de Solicitud")
     tipo_solicitud = st.radio(
         "¿Qué movimiento de plantilla desea tramitar?",
         TIPOS_SOLICITUD,
@@ -200,7 +199,7 @@ def vista_solicitante(datos_usuario):
     razon_cese = "N/A"
     
     if tipo_solicitud == "Sustitución":
-        st.subheader(f"📋 Formulario de {tipo_solicitud}")
+        st.subheader(f" Formulario de {tipo_solicitud}")
         
         # Selector de motivo fuera del form para mostrar la caja de texto si elige 'Cese'
         col_m1, col_m2 = st.columns([1, 2])
