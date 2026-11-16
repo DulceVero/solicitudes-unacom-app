@@ -45,7 +45,7 @@ GRADOS_INSTRUCCION = [
 
 ESTADOS_SOLICITUD = ["Pendiente", "En Revisión", "Aprobado", "Rechazado"]
 
-# Columnas unificadas para Google Sheets (sin duplicados)
+# Columnas unificadas y ordenadas estrictamente
 COLUMNAS_ESPERADAS = [
     "ID", "Fecha", "Solicitante", "Cédula Solicitante",
     "Tipo Solicitante", "Área de Trabajo", "Nombre de Comuna", "Código SITUR",
@@ -70,34 +70,40 @@ def conectar_google_sheets():
     sheet = client.open("BD_Movimientos_Personal").sheet1
     return sheet
 
-def reparar_encabezados_si_es_necesario(sheet):
-    """Corrige automáticamente la fila 1 si hay encabezados duplicados o viejos."""
+def reparar_o_inicializar_hoja(sheet):
+    """Verifica los encabezados y asegura que la estructura sea coherente."""
     fila_1 = sheet.row_values(1)
-    if not fila_1:
-        sheet.append_row(COLUMNAS_ESPERADAS)
-    elif len(fila_1) != len(set(fila_1)) or fila_1 != COLUMNAS_ESPERADAS:
+    if not fila_1 or fila_1 != COLUMNAS_ESPERADAS:
         sheet.update("A1", [COLUMNAS_ESPERADAS])
 
 def cargar_datos():
     try:
         sheet = conectar_google_sheets()
-        reparar_encabezados_si_es_necesario(sheet)
-        # Pasamos expected_headers para evitar cualquier error de columnas duplicadas
+        reparar_o_inicializar_hoja(sheet)
         registros = sheet.get_all_records(expected_headers=COLUMNAS_ESPERADAS)
-        return registros
+        
+        # Limpieza de DataFrame para evitar columnas desordenadas o vacías
+        if registros:
+            df = pd.DataFrame(registros)
+            for col in COLUMNAS_ESPERADAS:
+                if col not in df.columns:
+                    df[col] = "N/A"
+            df = df[COLUMNAS_ESPERADAS] # Ordena estrictamente las columnas
+            return df.to_dict(orient="records")
+        return []
     except Exception as e:
         st.error(f"Error al conectar con Google Sheets: {e}")
         return []
 
 def guardar_nueva_solicitud(nueva_fila_dict):
     sheet = conectar_google_sheets()
-    reparar_encabezados_si_es_necesario(sheet)
-    fila_ordenada = [nueva_fila_dict.get(col, "N/A") for col in COLUMNAS_ESPERADAS]
+    reparar_o_inicializar_hoja(sheet)
+    fila_ordenada = [str(nueva_fila_dict.get(col, "N/A")) for col in COLUMNAS_ESPERADAS]
     sheet.append_row(fila_ordenada)
 
 def actualizar_estatus_en_sheets(solicitud_id, nuevo_estado):
     sheet = conectar_google_sheets()
-    reparar_encabezados_si_es_necesario(sheet)
+    reparar_o_inicializar_hoja(sheet)
     registros = sheet.get_all_records(expected_headers=COLUMNAS_ESPERADAS)
     df = pd.DataFrame(registros)
     if not df.empty and "ID" in df.columns:
@@ -173,7 +179,6 @@ def renderizar_datos_solicitante(datos_usuario):
         estado_vzla = st.selectbox("Estado *", ESTADOS_VENEZUELA)
         nombre_solicitante = st.text_input("Nombre y Apellido del Solicitante *", value=datos_usuario["nombre"])
     with c_g2:
-        # Solo permite números enteros para la cédula
         cedula_solicitante = st.number_input("Cédula del Solicitante (Solo números) *", min_value=0, step=1, format="%d")
         if subtipo in ["UTL", "PNF"]:
             area_trabajo = st.text_input("Área de Trabajo *", placeholder="Escriba su área de trabajo")
