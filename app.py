@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import gspread
+import re
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
@@ -44,7 +45,7 @@ GRADOS_INSTRUCCION = [
 
 ESTADOS_SOLICITUD = ["Pendiente", "En Revisión", "Aprobado", "Rechazado"]
 
-# Columnas unificadas para Google Sheets
+# Columnas unificadas para Google Sheets (sin duplicados)
 COLUMNAS_ESPERADAS = [
     "ID", "Fecha", "Solicitante", "Cédula Solicitante",
     "Tipo Solicitante", "Área de Trabajo", "Nombre de Comuna", "Código SITUR",
@@ -69,13 +70,20 @@ def conectar_google_sheets():
     sheet = client.open("BD_Movimientos_Personal").sheet1
     return sheet
 
+def reparar_encabezados_si_es_necesario(sheet):
+    """Corrige automáticamente la fila 1 si hay encabezados duplicados o viejos."""
+    fila_1 = sheet.row_values(1)
+    if not fila_1:
+        sheet.append_row(COLUMNAS_ESPERADAS)
+    elif len(fila_1) != len(set(fila_1)) or fila_1 != COLUMNAS_ESPERADAS:
+        sheet.update("A1", [COLUMNAS_ESPERADAS])
+
 def cargar_datos():
     try:
         sheet = conectar_google_sheets()
-        registros = sheet.get_all_records()
-        if not registros and not sheet.row_values(1):
-            sheet.append_row(COLUMNAS_ESPERADAS)
-            return []
+        reparar_encabezados_si_es_necesario(sheet)
+        # Pasamos expected_headers para evitar cualquier error de columnas duplicadas
+        registros = sheet.get_all_records(expected_headers=COLUMNAS_ESPERADAS)
         return registros
     except Exception as e:
         st.error(f"Error al conectar con Google Sheets: {e}")
@@ -83,24 +91,25 @@ def cargar_datos():
 
 def guardar_nueva_solicitud(nueva_fila_dict):
     sheet = conectar_google_sheets()
-    encabezados_actuales = sheet.row_values(1)
-    if not encabezados_actuales:
-        sheet.append_row(COLUMNAS_ESPERADAS)
-    elif encabezados_actuales != COLUMNAS_ESPERADAS:
-        sheet.update("A1", [COLUMNAS_ESPERADAS])
+    reparar_encabezados_si_es_necesario(sheet)
     fila_ordenada = [nueva_fila_dict.get(col, "N/A") for col in COLUMNAS_ESPERADAS]
     sheet.append_row(fila_ordenada)
 
 def actualizar_estatus_en_sheets(solicitud_id, nuevo_estado):
     sheet = conectar_google_sheets()
-    registros = sheet.get_all_records()
+    reparar_encabezados_si_es_necesario(sheet)
+    registros = sheet.get_all_records(expected_headers=COLUMNAS_ESPERADAS)
     df = pd.DataFrame(registros)
     if not df.empty and "ID" in df.columns:
-        indices = df.index[df["ID"] == solicitud_id].tolist()
+        indices = df.index[df["ID"].astype(str) == str(solicitud_id)].tolist()
         if indices:
             fila_sheet = indices[0] + 2
             col_estado = COLUMNAS_ESPERADAS.index("Estado") + 1
             sheet.update_cell(fila_sheet, col_estado, nuevo_estado)
+
+def es_correo_valido(correo):
+    patron = r"^[\w\.-]+@[\w\.-]+\.\w+$"
+    return bool(re.match(patron, correo.strip()))
 
 # --- CONFIGURACIÓN DE USUARIOS Y ROLES ---
 USUARIOS = {
@@ -164,7 +173,8 @@ def renderizar_datos_solicitante(datos_usuario):
         estado_vzla = st.selectbox("Estado *", ESTADOS_VENEZUELA)
         nombre_solicitante = st.text_input("Nombre y Apellido del Solicitante *", value=datos_usuario["nombre"])
     with c_g2:
-        cedula_solicitante = st.number_input("Cédula del Solicitante *", placeholder="Ej. V-12345678")
+        # Solo permite números enteros para la cédula
+        cedula_solicitante = st.number_input("Cédula del Solicitante (Solo números) *", min_value=0, step=1, format="%d")
         if subtipo in ["UTL", "PNF"]:
             area_trabajo = st.text_input("Área de Trabajo *", placeholder="Escriba su área de trabajo")
         else:
@@ -263,7 +273,7 @@ def vista_solicitante(datos_usuario):
             with c_sal2:
                 sal_apellido = st.text_input("Apellido (Saliente) *")
             with c_sal3:
-                sal_cedula = st.number_input("Cédula (Saliente) *")
+                sal_cedula = st.number_input("Cédula (Saliente) *", min_value=0, step=1, format="%d")
 
             st.markdown("---")
             st.markdown("#### 🆕 Datos del Personal Entrante")
@@ -275,8 +285,8 @@ def vista_solicitante(datos_usuario):
                 ent_apellido = st.text_input("Apellido (Entrante) *")
                 ent_grado = st.selectbox("Grado de Instrucción *", GRADOS_INSTRUCCION)
             with c_ent3:
-                ent_cedula = st.number_input("Cédula (Entrante) *")
-                ent_correo = st.text_input("Correo Electrónico *", placeholder="ejemplo@correo.com", type="email")
+                ent_cedula = st.number_input("Cédula (Entrante) *", min_value=0, step=1, format="%d")
+                ent_correo = st.text_input("Correo Electrónico *", placeholder="ejemplo@correo.com")
 
             st.warning("📌 **Recordatorio:** Enviar la solicitud escrita y documentos del personal entrante")
 
@@ -284,15 +294,20 @@ def vista_solicitante(datos_usuario):
 
             if submitted:
                 ubicacion_ok = validar_datos_ubicacion(subtipo, area_trabajo, nombre_comuna, codigo_situr)
+                cedulas_validas = (cedula_solicitante > 0) and (sal_cedula > 0) and (ent_cedula > 0)
                 faltan_datos = not all([
-                    nombre_solicitante, cedula_solicitante, ubicacion_ok,
-                    sal_nombre, sal_apellido, sal_cedula,
-                    ent_nombre, ent_apellido, ent_cedula, ent_profesion, ent_correo
+                    nombre_solicitante.strip(), ubicacion_ok,
+                    sal_nombre.strip(), sal_apellido.strip(),
+                    ent_nombre.strip(), ent_apellido.strip(), ent_profesion.strip(), ent_correo.strip()
                 ])
                 if motivo_sust == "Cese" and not razon_cese.strip():
                     st.error("⚠️ Debe escribir la razón del cese antes de enviar la solicitud.")
                 elif faltan_datos:
                     st.error("⚠️ Por favor complete todos los campos obligatorios marcados con (*).")
+                elif not cedulas_validas:
+                    st.error("⚠️ Todas las cédulas deben ser mayores a 0.")
+                elif not es_correo_valido(ent_correo):
+                    st.error("⚠️ Ingrese un correo electrónico válido (ejemplo@dominio.com).")
                 else:
                     with st.spinner("Registrando sustitución en Google Sheets..."):
                         registros_actuales = cargar_datos()
@@ -301,25 +316,25 @@ def vista_solicitante(datos_usuario):
                         nueva_solicitud = {
                             "ID": nuevo_id,
                             "Fecha": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "Solicitante": nombre_solicitante,
-                            "Cédula Solicitante": cedula_solicitante,
+                            "Solicitante": nombre_solicitante.strip(),
+                            "Cédula Solicitante": int(cedula_solicitante),
                             "Tipo Solicitante": subtipo,
                             "Área de Trabajo": area_trabajo,
                             "Nombre de Comuna": nombre_comuna,
                             "Código SITUR": codigo_situr,
                             "Tipo de Solicitud": "Sustitución",
                             "Estado Geográfico": estado_vzla,
-                            "Saliente Nombre": sal_nombre,
-                            "Saliente Apellido": sal_apellido,
-                            "Saliente Cédula": sal_cedula,
+                            "Saliente Nombre": sal_nombre.strip(),
+                            "Saliente Apellido": sal_apellido.strip(),
+                            "Saliente Cédula": int(sal_cedula),
                             "Motivo": motivo_sust,
-                            "Detalle Motivo": razon_cese if motivo_sust == "Cese" else "N/A",
-                            "Entrante Nombre": ent_nombre,
-                            "Entrante Apellido": ent_apellido,
-                            "Entrante Cédula": ent_cedula,
-                            "Profesión": ent_profesion,
+                            "Detalle Motivo": razon_cese.strip() if motivo_sust == "Cese" else "N/A",
+                            "Entrante Nombre": ent_nombre.strip(),
+                            "Entrante Apellido": ent_apellido.strip(),
+                            "Entrante Cédula": int(ent_cedula),
+                            "Profesión": ent_profesion.strip(),
                             "Grado Instrucción": ent_grado,
-                            "Entrante Correo": ent_correo,
+                            "Entrante Correo": ent_correo.strip(),
                             "Nuevo Rol": "N/A",
                             "Estado": "Pendiente"
                         }
@@ -339,7 +354,7 @@ def vista_solicitante(datos_usuario):
             cp1, cp2 = st.columns(2)
             with cp1:
                 p_nombre = st.text_input("Nombre *")
-                p_cedula = st.number_input("Cédula *")
+                p_cedula = st.number_input("Cédula (Solo números) *", min_value=0, step=1, format="%d")
                 p_grado = st.selectbox("Grado de Instrucción *", GRADOS_INSTRUCCION)
             with cp2:
                 p_apellido = st.text_input("Apellido *")
@@ -348,8 +363,10 @@ def vista_solicitante(datos_usuario):
             submitted_inc = st.form_submit_button("Enviar Solicitud de Incorporación", use_container_width=True)
             if submitted_inc:
                 ubicacion_ok = validar_datos_ubicacion(subtipo, area_trabajo, nombre_comuna, codigo_situr)
-                if not all([nombre_solicitante, cedula_solicitante, ubicacion_ok, p_nombre, p_apellido, p_cedula, p_profesion]):
+                if not all([nombre_solicitante.strip(), ubicacion_ok, p_nombre.strip(), p_apellido.strip(), p_profesion.strip()]):
                     st.error("⚠️ Complete todos los campos obligatorios marcados con (*).")
+                elif cedula_solicitante <= 0 or p_cedula <= 0:
+                    st.error("⚠️ Las cédulas deben ser mayores a 0.")
                 else:
                     with st.spinner("Registrando incorporación en Google Sheets..."):
                         registros_actuales = cargar_datos()
@@ -358,8 +375,8 @@ def vista_solicitante(datos_usuario):
                         nueva_solicitud = {
                             "ID": nuevo_id,
                             "Fecha": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "Solicitante": nombre_solicitante,
-                            "Cédula Solicitante": cedula_solicitante,
+                            "Solicitante": nombre_solicitante.strip(),
+                            "Cédula Solicitante": int(cedula_solicitante),
                             "Tipo Solicitante": subtipo,
                             "Área de Trabajo": area_trabajo,
                             "Nombre de Comuna": nombre_comuna,
@@ -371,10 +388,10 @@ def vista_solicitante(datos_usuario):
                             "Saliente Cédula": "N/A",
                             "Motivo": "Incorporación",
                             "Detalle Motivo": "N/A",
-                            "Entrante Nombre": p_nombre,
-                            "Entrante Apellido": p_apellido,
-                            "Entrante Cédula": p_cedula,
-                            "Profesión": p_profesion,
+                            "Entrante Nombre": p_nombre.strip(),
+                            "Entrante Apellido": p_apellido.strip(),
+                            "Entrante Cédula": int(p_cedula),
+                            "Profesión": p_profesion.strip(),
                             "Grado Instrucción": p_grado,
                             "Entrante Correo": "N/A",
                             "Nuevo Rol": "N/A",
@@ -408,7 +425,7 @@ def vista_solicitante(datos_usuario):
             cp1, cp2 = st.columns(2)
             with cp1:
                 p_nombre = st.text_input("Nombre *")
-                p_cedula = st.number_input("Cédula *")
+                p_cedula = st.number_input("Cédula (Solo números) *", min_value=0, step=1, format="%d")
                 p_grado = st.selectbox("Grado de Instrucción *", GRADOS_INSTRUCCION)
             with cp2:
                 p_apellido = st.text_input("Apellido *")
@@ -419,8 +436,10 @@ def vista_solicitante(datos_usuario):
                 ubicacion_ok = validar_datos_ubicacion(subtipo, area_trabajo, nombre_comuna, codigo_situr)
                 if motivo_desinc in ["Cese", "Otro"] and not detalle_desinc.strip():
                     st.error(f"⚠️ Debe especificar el detalle para el motivo '{motivo_desinc}'.")
-                elif not all([nombre_solicitante, cedula_solicitante, ubicacion_ok, p_nombre, p_apellido, p_cedula, p_profesion]):
+                elif not all([nombre_solicitante.strip(), ubicacion_ok, p_nombre.strip(), p_apellido.strip(), p_profesion.strip()]):
                     st.error("⚠️ Complete todos los campos obligatorios marcados con (*).")
+                elif cedula_solicitante <= 0 or p_cedula <= 0:
+                    st.error("⚠️ Las cédulas deben ser mayores a 0.")
                 else:
                     with st.spinner("Registrando desincorporación en Google Sheets..."):
                         registros_actuales = cargar_datos()
@@ -429,23 +448,23 @@ def vista_solicitante(datos_usuario):
                         nueva_solicitud = {
                             "ID": nuevo_id,
                             "Fecha": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "Solicitante": nombre_solicitante,
-                            "Cédula Solicitante": cedula_solicitante,
+                            "Solicitante": nombre_solicitante.strip(),
+                            "Cédula Solicitante": int(cedula_solicitante),
                             "Tipo Solicitante": subtipo,
                             "Área de Trabajo": area_trabajo,
                             "Nombre de Comuna": nombre_comuna,
                             "Código SITUR": codigo_situr,
                             "Tipo de Solicitud": "Desincorporación",
                             "Estado Geográfico": estado_vzla,
-                            "Saliente Nombre": p_nombre,
-                            "Saliente Apellido": p_apellido,
-                            "Saliente Cédula": p_cedula,
+                            "Saliente Nombre": p_nombre.strip(),
+                            "Saliente Apellido": p_apellido.strip(),
+                            "Saliente Cédula": int(p_cedula),
                             "Motivo": motivo_desinc,
-                            "Detalle Motivo": detalle_desinc if motivo_desinc in ["Cese", "Otro"] else "N/A",
+                            "Detalle Motivo": detalle_desinc.strip() if motivo_desinc in ["Cese", "Otro"] else "N/A",
                             "Entrante Nombre": "N/A",
                             "Entrante Apellido": "N/A",
                             "Entrante Cédula": "N/A",
-                            "Profesión": p_profesion,
+                            "Profesión": p_profesion.strip(),
                             "Grado Instrucción": p_grado,
                             "Entrante Correo": "N/A",
                             "Nuevo Rol": "N/A",
@@ -467,7 +486,7 @@ def vista_solicitante(datos_usuario):
             cp1, cp2 = st.columns(2)
             with cp1:
                 p_nombre = st.text_input("Nombre *")
-                p_cedula = st.number_input("Cédula *")
+                p_cedula = st.number_input("Cédula (Solo números) *", min_value=0, step=1, format="%d")
             with cp2:
                 p_apellido = st.text_input("Apellido *")
                 p_profesion = st.text_input("Profesión *")
@@ -477,8 +496,10 @@ def vista_solicitante(datos_usuario):
             submitted_rol = st.form_submit_button("Enviar Solicitud de Cambio de Rol", use_container_width=True)
             if submitted_rol:
                 ubicacion_ok = validar_datos_ubicacion(subtipo, area_trabajo, nombre_comuna, codigo_situr)
-                if not all([nombre_solicitante, cedula_solicitante, ubicacion_ok, p_nombre, p_apellido, p_cedula, p_profesion]):
+                if not all([nombre_solicitante.strip(), ubicacion_ok, p_nombre.strip(), p_apellido.strip(), p_profesion.strip()]):
                     st.error("⚠️ Complete todos los campos obligatorios marcados con (*).")
+                elif cedula_solicitante <= 0 or p_cedula <= 0:
+                    st.error("⚠️ Las cédulas deben ser mayores a 0.")
                 else:
                     with st.spinner("Registrando cambio de rol en Google Sheets..."):
                         registros_actuales = cargar_datos()
@@ -487,23 +508,23 @@ def vista_solicitante(datos_usuario):
                         nueva_solicitud = {
                             "ID": nuevo_id,
                             "Fecha": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "Solicitante": nombre_solicitante,
-                            "Cédula Solicitante": cedula_solicitante,
+                            "Solicitante": nombre_solicitante.strip(),
+                            "Cédula Solicitante": int(cedula_solicitante),
                             "Tipo Solicitante": subtipo,
                             "Área de Trabajo": area_trabajo,
                             "Nombre de Comuna": nombre_comuna,
                             "Código SITUR": codigo_situr,
                             "Tipo de Solicitud": "Cambio de rol",
                             "Estado Geográfico": estado_vzla,
-                            "Saliente Nombre": p_nombre,
-                            "Saliente Apellido": p_apellido,
-                            "Saliente Cédula": p_cedula,
+                            "Saliente Nombre": p_nombre.strip(),
+                            "Saliente Apellido": p_apellido.strip(),
+                            "Saliente Cédula": int(p_cedula),
                             "Motivo": "Cambio de rol",
                             "Detalle Motivo": "N/A",
                             "Entrante Nombre": "N/A",
                             "Entrante Apellido": "N/A",
                             "Entrante Cédula": "N/A",
-                            "Profesión": p_profesion,
+                            "Profesión": p_profesion.strip(),
                             "Grado Instrucción": "N/A",
                             "Entrante Correo": "N/A",
                             "Nuevo Rol": nuevo_rol,
@@ -585,7 +606,7 @@ def vista_responsable(datos_usuario):
             with col_g1:
                 sol_id = st.selectbox("ID de Solicitud", df_filtrado["ID"].tolist())
 
-            fila_sel = df_total[df_total["ID"] == sol_id]
+            fila_sel = df_total[df_total["ID"].astype(str) == str(sol_id)]
             if not fila_sel.empty:
                 actual_status = fila_sel.iloc[0]["Estado"]
                 idx_status = ESTADOS_SOLICITUD.index(actual_status) if actual_status in ESTADOS_SOLICITUD else 0
@@ -713,7 +734,7 @@ def vista_consolidada(datos_usuario):
             with col_g1:
                 sol_id = st.selectbox("ID de Solicitud", df_filtrado["ID"].tolist())
 
-            fila_sel = df_total[df_total["ID"] == sol_id]
+            fila_sel = df_total[df_total["ID"].astype(str) == str(sol_id)]
             if not fila_sel.empty:
                 actual_status = fila_sel.iloc[0]["Estado"]
                 idx_status = ESTADOS_SOLICITUD.index(actual_status) if actual_status in ESTADOS_SOLICITUD else 0
