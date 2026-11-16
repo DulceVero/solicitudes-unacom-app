@@ -13,21 +13,17 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- ESTILO CSS PERSONALIZADO PARA st.data_editor (AZUL CLARO Y NEGRITA) ---
+# --- ESTILO CSS PERSONALIZADO PARA ENCABEZADOS DE st.data_editor ---
 st.markdown("""
 <style>
-    /* Forzar diseño en cabeceras de st.data_editor y st.dataframe */
-    [data-testid="stDataEditor"] div[role="columnheader"],
-    [data-testid="stDataFrame"] div[role="columnheader"],
-    th {
+    /* Forzar fondo azul claro y letras en negrita en los encabezados de las tablas */
+    [data-testid="stDataEditor"] th,
+    [data-testid="stDataFrame"] th,
+    div[data-testid="stDataEditor"] div[role="columnheader"],
+    div[data-testid="stDataFrame"] div[role="columnheader"] {
         background-color: #D6EAF8 !important;
         color: #154360 !important;
         font-weight: 800 !important;
-    }
-    
-    [data-testid="stDataEditor"] [data-baseweb="tag"],
-    div.stDataEditor, div.stDataFrame {
-        border-radius: 8px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -149,7 +145,7 @@ def guardar_nueva_solicitud(nueva_fila_dict):
     sheet.append_row(fila_ordenada)
 
 def actualizar_multiples_status_en_sheets(cambios_dict):
-    """Actualiza en bloque todos los Status modificados en la tabla."""
+    """Actualiza en bloque todos los Status modificados en Google Sheets."""
     sheet = conectar_google_sheets()
     reparar_o_inicializar_hoja(sheet)
     registros = sheet.get_all_records(expected_headers=COLUMNAS_ESPERADAS)
@@ -587,9 +583,9 @@ def vista_solicitante(datos_usuario):
                         guardar_nueva_solicitud(nueva_solicitud)
                     st.success(f"✅ ¡Solicitud de Cambio de Rol #{nuevo_id} enviada exitosamente!")
 
-# --- FUNCIÓN COMPARTIDA PARA TABLA INTERACTIVA (st.data_editor) ---
+# --- FUNCIÓN COMPARTIDA PARA TABLA INTERACTIVA CON st.data_editor (SOLO STATUS EDITABLE) ---
 def renderizar_tabla_gestionable(df_vista, columnas_visibles, key_editor):
-    st.caption("💡 **Tip:** Puede cambiar el **Status** directamente haciendo clic sobre la celda correspondiente en la tabla y luego presionar **💾 Guardar Cambios de Status**.")
+    st.caption("💡 **Tip:** Haga clic en la columna **Status** de cualquier fila para cambiar su valor directamente, luego presione **💾 Guardar Cambios de Status**.")
     
     df_mostrar = df_vista[columnas_visibles].copy()
     
@@ -597,6 +593,7 @@ def renderizar_tabla_gestionable(df_vista, columnas_visibles, key_editor):
         lambda x: x if x in STATUS_SOLICITUD else "Pendiente"
     )
 
+    # BLOQUEAR estrictamente todas las columnas excepto 'Status'
     columnas_bloqueadas = [col for col in columnas_visibles if col != "Status"]
 
     df_editado = st.data_editor(
@@ -606,7 +603,7 @@ def renderizar_tabla_gestionable(df_vista, columnas_visibles, key_editor):
         disabled=columnas_bloqueadas,
         column_config={
             "Status": st.column_config.SelectboxColumn(
-                "Status",
+                "Status (Editable)",
                 help="Seleccione el nuevo status de la solicitud",
                 width="medium",
                 options=STATUS_SOLICITUD,
