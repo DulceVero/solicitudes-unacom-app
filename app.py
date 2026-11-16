@@ -13,30 +13,63 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- ESTILO NATIVO PARA GLIDE DATA GRID (CANVAS DE STREAMLIT) ---
-# Funciona tanto en Dark Mode como en Light Mode
+# --- ESTILO CSS PERSONALIZADO PARA TABLAS HTML (FUNCIONA EN LIGHT Y DARK MODE) ---
 st.markdown("""
 <style>
-    /* Variables internas que controlan el canvas de st.data_editor y st.dataframe */
-    [data-testid="stDataFrame"],
-    [data-testid="stDataEditor"],
-    .stDataFrame,
-    div[data-testid="stDataFrameResizable"] {
-        --gdg-bg-header: #D6EAF8 !important;
-        --gdg-bg-header-has-focus: #AED6F1 !important;
-        --gdg-bg-header-hovered: #AED6F1 !important;
-        --gdg-text-header: #154360 !important;
-        --gdg-header-font-style: 800 14px !important;
-        --gdg-border-color: #85C1E9 !important;
+    .tabla-contenedor {
+        width: 100%;
+        overflow-x: auto;
+        border-radius: 10px;
+        border: 1px solid #85C1E9;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+        margin-bottom: 1rem;
     }
-
-    /* Respaldo para elementos DOM internos */
-    [data-testid="stDataFrame"] *,
-    [data-testid="stDataEditor"] * {
-        --gdg-bg-header: #D6EAF8 !important;
-        --gdg-text-header: #154360 !important;
-        --gdg-header-font-style: bold 14px !important;
+    table.tabla-personalizada {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 13.5px;
+        white-space: nowrap;
     }
+    table.tabla-personalizada thead tr th {
+        background-color: #D6EAF8 !important;
+        color: #154360 !important;
+        font-weight: 800 !important;
+        text-align: left;
+        padding: 12px 14px;
+        border-bottom: 2px solid #5DADE2;
+        border-right: 1px solid #AED6F1;
+        position: sticky;
+        top: 0;
+    }
+    table.tabla-personalizada tbody tr {
+        background-color: #FFFFFF;
+        color: #1C2833;
+        border-bottom: 1px solid #E5E8E8;
+        transition: background-color 0.15s ease;
+    }
+    table.tabla-personalizada tbody tr:nth-child(even) {
+        background-color: #F8FBFD;
+    }
+    table.tabla-personalizada tbody tr:hover {
+        background-color: #EBF5FB;
+    }
+    table.tabla-personalizada tbody td {
+        padding: 10px 14px;
+        border-right: 1px solid #F2F4F4;
+    }
+    /* Badges de colores para el Status */
+    .badge-status {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 12px;
+        display: inline-block;
+    }
+    .status-pendiente { background-color: #FEF5E7; color: #D68910; border: 1px solid #F8C471; }
+    .status-revision  { background-color: #EBF5FB; color: #2874A6; border: 1px solid #85C1E9; }
+    .status-aprobado  { background-color: #EAFAF1; color: #1E8449; border: 1px solid #82E0AA; }
+    .status-rechazado { background-color: #FDEDEC; color: #C0392B; border: 1px solid #F1948A; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -156,19 +189,18 @@ def guardar_nueva_solicitud(nueva_fila_dict):
     fila_ordenada = [str(nueva_fila_dict.get(col, "N/A")) for col in COLUMNAS_ESPERADAS]
     sheet.append_row(fila_ordenada)
 
-def actualizar_multiples_status_en_sheets(cambios_dict):
-    """Actualiza en bloque todos los Status modificados en la tabla."""
+def actualizar_status_en_sheets(solicitud_id, nuevo_status):
+    """Actualiza el Status de una solicitud específica en Google Sheets."""
     sheet = conectar_google_sheets()
     reparar_o_inicializar_hoja(sheet)
     registros = sheet.get_all_records(expected_headers=COLUMNAS_ESPERADAS)
     df = pd.DataFrame(registros)
     if not df.empty and "ID" in df.columns:
         col_status = COLUMNAS_ESPERADAS.index("Status") + 1
-        for sol_id, nuevo_status in cambios_dict.items():
-            indices = df.index[df["ID"].astype(str) == str(sol_id)].tolist()
-            if indices:
-                fila_sheet = indices[0] + 2
-                sheet.update_cell(fila_sheet, col_status, nuevo_status)
+        indices = df.index[df["ID"].astype(str) == str(solicitud_id)].tolist()
+        if indices:
+            fila_sheet = indices[0] + 2
+            sheet.update_cell(fila_sheet, col_status, nuevo_status)
 
 def es_correo_valido(correo):
     patron = r"^[\w\.-]+@[\w\.-]+\.\w+$"
@@ -595,54 +627,93 @@ def vista_solicitante(datos_usuario):
                         guardar_nueva_solicitud(nueva_solicitud)
                     st.success(f"✅ ¡Solicitud de Cambio de Rol #{nuevo_id} enviada exitosamente!")
 
-# --- FUNCIÓN COMPARTIDA PARA TABLA INTERACTIVA CON EDICIÓN DE STATUS ---
-def renderizar_tabla_gestionable(df_vista, columnas_visibles, key_editor):
-    st.caption("💡 **Tip:** Puede cambiar el **Status** directamente haciendo clic sobre la celda correspondiente en la tabla y luego presionar **Guardar Cambios de Status**.")
-    
+# --- FUNCIÓN PARA RENDERIZAR TABLA HTML ESTILIZADA + GESTIÓN RÁPIDA POR CÉDULA ---
+def formatear_badge_status(status):
+    s = str(status).strip()
+    if s == "Aprobado":
+        return f'<span class="badge-status status-aprobado">✅ {s}</span>'
+    elif s == "En Revisión":
+        return f'<span class="badge-status status-revision">🔍 {s}</span>'
+    elif s == "Rechazado":
+        return f'<span class="badge-status status-rechazado">❌ {s}</span>'
+    else:
+        return f'<span class="badge-status status-pendiente">⏳ Pendiente</span>'
+
+def renderizar_tabla_estilizada_y_gestion(df_vista, columnas_visibles, key_prefix):
     df_mostrar = df_vista[columnas_visibles].copy()
-    
-    df_mostrar["Status"] = df_mostrar["Status"].apply(
-        lambda x: x if x in STATUS_SOLICITUD else "Pendiente"
-    )
 
-    columnas_bloqueadas = [col for col in columnas_visibles if col != "Status"]
-
-    df_editado = st.data_editor(
-        df_mostrar,
-        use_container_width=True,
-        hide_index=True,
-        disabled=columnas_bloqueadas,
-        column_config={
-            "Status": st.column_config.SelectboxColumn(
-                "Status",
-                help="Seleccione el nuevo status de la solicitud",
-                width="medium",
-                options=STATUS_SOLICITUD,
-                required=True,
-            ),
-            "ID": st.column_config.NumberColumn("ID", width="small"),
-        },
-        key=key_editor
-    )
-
-    cambios = {}
-    for idx in range(len(df_mostrar)):
-        status_original = df_mostrar.iloc[idx]["Status"]
-        status_nuevo = df_editado.iloc[idx]["Status"]
-        sol_id = df_mostrar.iloc[idx]["ID"]
-        if status_original != status_nuevo:
-            cambios[sol_id] = status_nuevo
-
-    col_btn1, col_btn2 = st.columns([1, 3])
-    with col_btn1:
-        if st.button("💾 Guardar Cambios de Status", key=f"btn_{key_editor}", use_container_width=True, type="primary"):
-            if cambios:
-                with st.spinner("Guardando cambios en Google Sheets..."):
-                    actualizar_multiples_status_en_sheets(cambios)
-                st.success(f"✅ Se actualizaron {len(cambios)} solicitud(es) correctamente.")
-                st.rerun()
+    # Construir tabla HTML con encabezados azul claro (#D6EAF8) y negrita
+    encabezados_html = "".join([f"<th>{col}</th>" for col in columnas_visibles])
+    filas_html = ""
+    for _, row in df_mostrar.iterrows():
+        celdas = ""
+        for col in columnas_visibles:
+            valor = row[col]
+            if col == "Status":
+                celdas += f"<td>{formatear_badge_status(valor)}</td>"
+            elif col == "ID":
+                celdas += f"<td><strong>#{valor}</strong></td>"
             else:
-                st.info("No se detectaron cambios nuevos en la columna Status.")
+                celdas += f"<td>{valor}</td>"
+        filas_html += f"<tr>{celdas}</tr>"
+
+    tabla_html = f"""
+    <div class="tabla-contenedor">
+        <table class="tabla-personalizada">
+            <thead>
+                <tr>{encabezados_html}</tr>
+            </thead>
+            <tbody>
+                {filas_html}
+            </tbody>
+        </table>
+    </div>
+    """
+    st.markdown(tabla_html, unsafe_allow_html=True)
+
+    # --- GESTIÓN RÁPIDA DE STATUS FILTRADA POR CÉDULA ---
+    st.markdown("---")
+    st.subheader("⚡ Gestión Rápida de Status por Cédula")
+
+    # Crear opciones legibles identificadas por Cédula
+    opciones_solicitudes = {}
+    for _, row in df_vista.iterrows():
+        ced_sol = str(row.get("Cédula Solicitante", "N/A"))
+        ced_sal = str(row.get("Saliente Cédula", "N/A"))
+        ced_ent = str(row.get("Entrante Cédula", "N/A"))
+        
+        # Determinar la cédula principal del afectado o solicitante
+        ced_afectado = ced_ent if ced_ent not in ["N/A", "", "0"] else (ced_sal if ced_sal not in ["N/A", "", "0"] else ced_sol)
+        etiqueta = f"C.I. {ced_afectado} — {row['Tipo de Solicitud']} (Solicitante C.I. {ced_sol} | ID #{row['ID']}) [{row['Status']}]"
+        opciones_solicitudes[etiqueta] = row["ID"]
+
+    col_g1, col_g2, col_g3 = st.columns([2.2, 1, 1])
+    with col_g1:
+        seleccion_etiqueta = st.selectbox(
+            "Seleccione la solicitud por Cédula",
+            list(opciones_solicitudes.keys()),
+            key=f"sel_ced_{key_prefix}"
+        )
+    
+    sol_id_elegida = opciones_solicitudes[seleccion_etiqueta]
+    fila_actual = df_vista[df_vista["ID"].astype(str) == str(sol_id_elegida)].iloc[0]
+    status_actual = fila_actual["Status"] if fila_actual["Status"] in STATUS_SOLICITUD else "Pendiente"
+
+    with col_g2:
+        nuevo_status = st.selectbox(
+            "Nuevo Status",
+            STATUS_SOLICITUD,
+            index=STATUS_SOLICITUD.index(status_actual),
+            key=f"sel_st_{key_prefix}"
+        )
+    with col_g3:
+        st.write("")
+        st.write("")
+        if st.button("💾 Actualizar Status", key=f"btn_upd_{key_prefix}", use_container_width=True, type="primary"):
+            with st.spinner("Actualizando Google Sheets..."):
+                actualizar_status_en_sheets(sol_id_elegida, nuevo_status)
+            st.success(f"✅ Solicitud #{sol_id_elegida} actualizada a **{nuevo_status}**.")
+            st.rerun()
 
 # --- VISTA 2: RESPONSABLE DE ÁREA (BANDEJA Y GRÁFICAS EXCLUSIVAS DE SU ÁREA) ---
 def vista_responsable(datos_usuario):
@@ -710,7 +781,7 @@ def vista_responsable(datos_usuario):
             df_filtrado = df_filtrado[df_filtrado["Status"] == filtro_status]
 
         if not df_filtrado.empty:
-            renderizar_tabla_gestionable(df_filtrado, columnas_area, key_editor=f"editor_{area_resp}")
+            renderizar_tabla_estilizada_y_gestion(df_filtrado, columnas_area, key_prefix=f"area_{area_resp}")
         else:
             st.info("No hay registros que coincidan con los filtros aplicados.")
 
@@ -813,7 +884,7 @@ def vista_consolidada(datos_usuario):
             df_filtrado = df_filtrado[df_filtrado["Status"] == filtro_status]
 
         if not df_filtrado.empty:
-            renderizar_tabla_gestionable(df_filtrado, COLUMNAS_CONSOLIDADO, key_editor="editor_consolidado")
+            renderizar_tabla_estilizada_y_gestion(df_filtrado, COLUMNAS_CONSOLIDADO, key_prefix="consolidado")
         else:
             st.info("No hay registros que coincidan con los filtros aplicados.")
 
