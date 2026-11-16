@@ -28,9 +28,7 @@ TIPOS_SOLICITUD = [
     "Cambio de rol"
 ]
 
-MOTIVOS_SUSTITUCION = ["Renuncia", "Cambio de rol", "Cese"]
-MOTIVOS_DESINCORPORACION = ["Renuncia", "Cese", "Otro"]
-ROLES_CAMBIO = ["Formador", "PNF", "UTL"]
+MOTIVOS_SALIDA = ["Renuncia", "Cambio de rol", "Cese"]
 
 GRADOS_INSTRUCCION = [
     "Bachiller",
@@ -46,14 +44,13 @@ ESTADOS_SOLICITUD = ["Pendiente", "En Revisión", "Aprobado", "Rechazado"]
 
 # Columnas unificadas para Google Sheets
 COLUMNAS_ESPERADAS = [
-    "ID", "Fecha", "Solicitante", "Cédula Solicitante",
-    "Tipo Solicitante", "Área de Trabajo", "Nombre de Comuna", "Código SITUR",
-    "Tipo de Solicitud", "Estado Geográfico",
+    "ID", "Fecha", "Solicitante", "Cédula Solicitante", "Cargo Solicitante",
+    "Área Origen", "Área Destino", "Tipo de Solicitud", "Estado Geográfico",
     "Saliente Nombre", "Saliente Apellido", "Saliente Cédula",
     "Motivo", "Detalle Motivo",
     "Entrante Nombre", "Entrante Apellido", "Entrante Cédula",
-    "Profesión", "Grado Instrucción", "Entrante Correo",
-    "Nuevo Rol", "Estado"
+    "Entrante Profesión", "Entrante Grado Instrucción", "Entrante Correo",
+    "Cargo Actual", "Cargo Nuevo", "Observaciones", "Estado"
 ]
 
 # --- CONEXIÓN A GOOGLE SHEETS ---
@@ -83,10 +80,12 @@ def cargar_datos():
 
 def guardar_nueva_solicitud(nueva_fila_dict):
     sheet = conectar_google_sheets()
+    # Verificar si los encabezados coinciden o están vacíos
     encabezados_actuales = sheet.row_values(1)
     if not encabezados_actuales:
         sheet.append_row(COLUMNAS_ESPERADAS)
     elif encabezados_actuales != COLUMNAS_ESPERADAS:
+        # Actualiza la fila 1 si tenías los encabezados de la versión anterior
         sheet.update("A1", [COLUMNAS_ESPERADAS])
         
     fila_ordenada = [nueva_fila_dict.get(col, "N/A") for col in COLUMNAS_ESPERADAS]
@@ -107,21 +106,24 @@ def actualizar_estatus_en_sheets(solicitud_id, nuevo_estado):
 USUARIOS = {
     "utl_user": {
         "password": "123",
-        "nombre": "Usuario UTL",
+        "nombre": "Coordinador UTL",
         "rol": "solicitante",
-        "subtipo": "UTL"
+        "area_origen": "UTL (Unidad Territorial Local)",
+        "areas_permitidas": [
+            "Coordinación Operativa y Territorial (UTL)",
+            "Talento Humano y Gestión de Personal"
+        ]
     },
-    "pnf_user": {
+    "solicitante_general": {
         "password": "123",
-        "nombre": "Usuario PNF",
+        "nombre": "Analista de Área",
         "rol": "solicitante",
-        "subtipo": "PNF"
-    },
-    "formador_user": {
-        "password": "123",
-        "nombre": "Usuario Formador",
-        "rol": "solicitante",
-        "subtipo": "Formador"
+        "area_origen": "Formación y Gestión del Conocimiento",
+        "areas_permitidas": [
+            "Talento Humano y Gestión de Personal",
+            "Coordinación Operativa y Territorial (UTL)",
+            "Administración, Finanzas y Presupuesto"
+        ]
     },
     "resp_th": {
         "password": "admin",
@@ -146,37 +148,6 @@ USUARIOS = {
 if "usuario_actual" not in st.session_state:
     st.session_state.usuario_actual = None
 
-# --- FUNCIÓN AUXILIAR PARA CAMPOS DE SOLICITANTE SEGÚN PERFIL ---
-def renderizar_datos_solicitante(datos_usuario):
-    st.markdown("#### Datos del Solicitante y Ubicación")
-    subtipo = datos_usuario.get("subtipo", "UTL")
-    
-    c_g1, c_g2 = st.columns(2)
-    with c_g1:
-        estado_vzla = st.selectbox("Estado *", ESTADOS_VENEZUELA)
-        nombre_solicitante = st.text_input("Nombre y Apellido del Solicitante *", value=datos_usuario["nombre"])
-    with c_g2:
-        cedula_solicitante = st.text_input("Cédula del Solicitante *", placeholder="Ej. V-12345678")
-        if subtipo in ["UTL", "PNF"]:
-            area_trabajo = st.text_input("Área de Trabajo *", placeholder="Escriba su área de trabajo")
-            nombre_comuna = "N/A"
-            codigo_situr = "N/A"
-        else:
-            # Perfil Formador: pide Nombre de Comuna y Código SITUR en lugar de Área de Trabajo
-            area_trabajo = "N/A"
-            nombre_comuna = st.text_input("Nombre de Comuna *", placeholder="Indique el nombre de la comuna")
-            
-    if subtipo == "Formador":
-        codigo_situr = st.text_input("Código SITUR *", placeholder="Ingrese el código SITUR")
-        
-    return estado_vzla, nombre_solicitante, cedula_solicitante, area_trabajo, nombre_comuna, codigo_situr
-
-def validar_datos_ubicacion(subtipo, area_trabajo, nombre_comuna, codigo_situr):
-    if subtipo in ["UTL", "PNF"]:
-        return bool(area_trabajo and area_trabajo.strip())
-    else:
-        return bool(nombre_comuna and nombre_comuna.strip() and codigo_situr and codigo_situr.strip())
-
 # --- FUNCIÓN DE LOGIN ---
 def pantalla_login():
     st.title("🔐 Control de Movimientos de Plantilla")
@@ -200,9 +171,8 @@ def pantalla_login():
         with st.expander("ℹ️ Credenciales de Prueba"):
             st.markdown("""
             **Usuarios Solicitantes (Solo Formulario):**
-            - UTL: `utl_user` | Contraseña: `123` *(Pide Área de Trabajo)*
-            - PNF: `pnf_user` | Contraseña: `123` *(Pide Área de Trabajo)*
-            - Formador: `formador_user` | Contraseña: `123` *(Pide Comuna y Código SITUR)*
+            - Usuario: `utl_user` | Contraseña: `123` *(Solo ve áreas vinculadas a UTL)*
+            - Usuario: `solicitante_general` | Contraseña: `123` *(Ve las 3 áreas)*
             
             **Responsables de Área (Bandeja + Gráficas):**
             - Talento Humano: `resp_th` | Contraseña: `admin`
@@ -212,10 +182,10 @@ def pantalla_login():
 
 # --- VISTA 1: SOLICITANTE (FORMULARIO DINÁMICO) ---
 def vista_solicitante(datos_usuario):
-    subtipo = datos_usuario.get("subtipo", "UTL")
     st.header("📝 Solicitud de Movimiento de Personal")
-    st.info(f"Conectado como: **{datos_usuario['nombre']}** | Perfil: **{subtipo}**")
+    st.info(f"Conectado como: **{datos_usuario['nombre']}** | Adscripción: **{datos_usuario['area_origen']}**")
     
+    # Paso 1: Selección del tipo de solicitud (FUERA del form para reactividad inmediata)
     st.subheader("1. Seleccione el Tipo de Solicitud")
     tipo_solicitud = st.radio(
         "¿Qué movimiento de plantilla desea tramitar?",
@@ -225,27 +195,43 @@ def vista_solicitante(datos_usuario):
     
     st.markdown("---")
     
-    # ==========================================
-    # FORMULARIO 1: SUSTITUCIÓN
-    # ==========================================
+    # Controles dinámicos previos al envío (ej. Motivo de Cese en Sustitución)
+    motivo_seleccionado = "N/A"
+    razon_cese = "N/A"
+    
     if tipo_solicitud == "Sustitución":
-        st.subheader("📋 Formulario de Sustitución")
+        st.subheader(f"📋 Formulario de {tipo_solicitud}")
         
+        # Selector de motivo fuera del form para mostrar la caja de texto si elige 'Cese'
         col_m1, col_m2 = st.columns([1, 2])
         with col_m1:
-            motivo_sust = st.selectbox("Motivo de la sustitución *", MOTIVOS_SUSTITUCION)
+            motivo_seleccionado = st.selectbox("Motivo de la sustitución *", MOTIVOS_SALIDA)
         with col_m2:
-            if motivo_sust == "Cese":
+            if motivo_seleccionado == "Cese":
                 razon_cese = st.text_input("Especifique la razón del cese *", placeholder="Indique el motivo detallado del cese...")
             else:
-                razon_cese = "N/A"
                 st.write("")
                 st.caption("Si selecciona 'Cese', se habilitará un campo para detallar la razón.")
 
         with st.form("form_sustitucion", clear_on_submit=True):
-            estado_vzla, nombre_solicitante, cedula_solicitante, area_trabajo, nombre_comuna, codigo_situr = renderizar_datos_solicitante(datos_usuario)
+            # Datos generales
+            st.markdown("#### Datos de Ubicación y Destino")
+            c_g1, c_g2, c_g3 = st.columns(3)
+            with c_g1:
+                estado_vzla = st.selectbox("Estado *", ESTADOS_VENEZUELA)
+            with c_g2:
+                area_destino = st.selectbox("Área Responsable Destino *", datos_usuario["areas_permitidas"])
+            with c_g3:
+                cargo_solicitante = st.text_input("Cargo del Solicitante *", placeholder="Ej. Coordinador UTL")
+
+            c_g4, c_g5 = st.columns(2)
+            with c_g4:
+                nombre_solicitante = st.text_input("Nombre y Apellido del Solicitante *", value=datos_usuario["nombre"])
+            with c_g5:
+                cedula_solicitante = st.text_input("Cédula del Solicitante *", placeholder="Ej. V-12345678")
 
             st.markdown("---")
+            # Sección Personal Saliente
             st.markdown("#### 👤 Datos del Personal Saliente")
             c_sal1, c_sal2, c_sal3 = st.columns(3)
             with c_sal1:
@@ -256,6 +242,7 @@ def vista_solicitante(datos_usuario):
                 sal_cedula = st.text_input("Cédula (Saliente) *")
 
             st.markdown("---")
+            # Sección Personal Entrante
             st.markdown("#### 🆕 Datos del Personal Entrante")
             c_ent1, c_ent2, c_ent3 = st.columns(3)
             with c_ent1:
@@ -268,18 +255,19 @@ def vista_solicitante(datos_usuario):
                 ent_cedula = st.text_input("Cédula (Entrante) *")
                 ent_correo = st.text_input("Correo Electrónico *", placeholder="ejemplo@correo.com")
 
+            # Recordatorio solicitado
             st.warning("📌 **Recordatorio:** Enviar la solicitud escrita y documentos del personal entrante")
 
             submitted = st.form_submit_button("Enviar Solicitud de Sustitución", use_container_width=True)
 
             if submitted:
-                ubicacion_ok = validar_datos_ubicacion(subtipo, area_trabajo, nombre_comuna, codigo_situr)
+                # Validaciones de campos obligatorios
                 faltan_datos = not all([
-                    nombre_solicitante, cedula_solicitante, ubicacion_ok,
+                    nombre_solicitante, cedula_solicitante, cargo_solicitante,
                     sal_nombre, sal_apellido, sal_cedula,
                     ent_nombre, ent_apellido, ent_cedula, ent_profesion, ent_correo
                 ])
-                if motivo_sust == "Cese" and not razon_cese.strip():
+                if motivo_seleccionado == "Cese" and not razon_cese.strip():
                     st.error("⚠️ Debe escribir la razón del cese antes de enviar la solicitud.")
                 elif faltan_datos:
                     st.error("⚠️ Por favor complete todos los campos obligatorios marcados con (*).")
@@ -293,55 +281,65 @@ def vista_solicitante(datos_usuario):
                             "Fecha": datetime.now().strftime("%Y-%m-%d %H:%M"),
                             "Solicitante": nombre_solicitante,
                             "Cédula Solicitante": cedula_solicitante,
-                            "Tipo Solicitante": subtipo,
-                            "Área de Trabajo": area_trabajo,
-                            "Nombre de Comuna": nombre_comuna,
-                            "Código SITUR": codigo_situr,
+                            "Cargo Solicitante": cargo_solicitante,
+                            "Área Origen": datos_usuario["area_origen"],
+                            "Área Destino": area_destino,
                             "Tipo de Solicitud": "Sustitución",
                             "Estado Geográfico": estado_vzla,
                             "Saliente Nombre": sal_nombre,
                             "Saliente Apellido": sal_apellido,
                             "Saliente Cédula": sal_cedula,
-                            "Motivo": motivo_sust,
-                            "Detalle Motivo": razon_cese if motivo_sust == "Cese" else "N/A",
+                            "Motivo": motivo_seleccionado,
+                            "Detalle Motivo": razon_cese if motivo_seleccionado == "Cese" else "N/A",
                             "Entrante Nombre": ent_nombre,
                             "Entrante Apellido": ent_apellido,
                             "Entrante Cédula": ent_cedula,
-                            "Profesión": ent_profesion,
-                            "Grado Instrucción": ent_grado,
+                            "Entrante Profesión": ent_profesion,
+                            "Entrante Grado Instrucción": ent_grado,
                             "Entrante Correo": ent_correo,
-                            "Nuevo Rol": "N/A",
+                            "Cargo Actual": "N/A",
+                            "Cargo Nuevo": "N/A",
+                            "Observaciones": "Sustitución registrada",
                             "Estado": "Pendiente"
                         }
                         guardar_nueva_solicitud(nueva_solicitud)
                     st.success(f"✅ ¡Solicitud de Sustitución #{nuevo_id} registrada exitosamente!")
 
-    # ==========================================
-    # FORMULARIO 2: INCORPORACIÓN
-    # ==========================================
-    elif tipo_solicitud == "Incorporación":
-        st.subheader("📋 Formulario de Incorporación")
-        with st.form("form_incorporacion", clear_on_submit=True):
-            estado_vzla, nombre_solicitante, cedula_solicitante, area_trabajo, nombre_comuna, codigo_situr = renderizar_datos_solicitante(datos_usuario)
+    # --- FORMULARIOS PARA LAS OTRAS 3 OPCIONES (Estructura lista para seguir personalizando) ---
+    else:
+        st.subheader(f"📋 Formulario de {tipo_solicitud}")
+        with st.form("form_otros_movimientos", clear_on_submit=True):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                estado_vzla = st.selectbox("Estado *", ESTADOS_VENEZUELA)
+                nombre_solicitante = st.text_input("Nombre y Apellido del Solicitante *", value=datos_usuario["nombre"])
+            with c2:
+                area_destino = st.selectbox("Área Responsable Destino *", datos_usuario["areas_permitidas"])
+                cedula_solicitante = st.text_input("Cédula del Solicitante *")
+            with c3:
+                cargo_solicitante = st.text_input("Cargo del Solicitante *")
 
             st.markdown("---")
-            st.markdown("#### 👤 Datos del Personal")
-            cp1, cp2 = st.columns(2)
+            st.markdown("#### Datos del Personal")
+            cp1, cp2, cp3 = st.columns(3)
             with cp1:
                 p_nombre = st.text_input("Nombre *")
-                p_cedula = st.text_input("Cédula *")
-                p_grado = st.selectbox("Grado de Instrucción *", GRADOS_INSTRUCCION)
+                cargo_actual = st.text_input("Cargo Actual")
             with cp2:
                 p_apellido = st.text_input("Apellido *")
-                p_profesion = st.text_input("Profesión *")
+                cargo_nuevo = st.text_input("Nuevo Cargo / Rol (si aplica)")
+            with cp3:
+                p_cedula = st.text_input("Cédula *")
+                p_correo = st.text_input("Correo Electrónico")
 
-            submitted_inc = st.form_submit_button("Enviar Solicitud de Incorporación", use_container_width=True)
-            if submitted_inc:
-                ubicacion_ok = validar_datos_ubicacion(subtipo, area_trabajo, nombre_comuna, codigo_situr)
-                if not all([nombre_solicitante, cedula_solicitante, ubicacion_ok, p_nombre, p_apellido, p_cedula, p_profesion]):
-                    st.error("⚠️ Complete todos los campos obligatorios marcados con (*).")
+            observaciones = st.text_area("Justificación / Detalle de la solicitud *")
+
+            submitted_otro = st.form_submit_button(f"Enviar Solicitud de {tipo_solicitud}", use_container_width=True)
+            if submitted_otro:
+                if not all([nombre_solicitante, cedula_solicitante, p_nombre, p_apellido, p_cedula, observaciones]):
+                    st.error("⚠️ Complete los campos obligatorios marcados con (*).")
                 else:
-                    with st.spinner("Registrando incorporación en Google Sheets..."):
+                    with st.spinner("Guardando en Google Sheets..."):
                         registros_actuales = cargar_datos()
                         nuevo_id = max([int(r["ID"]) for r in registros_actuales if str(r.get("ID", "")).isdigit()], default=0) + 1
                         
@@ -350,157 +348,29 @@ def vista_solicitante(datos_usuario):
                             "Fecha": datetime.now().strftime("%Y-%m-%d %H:%M"),
                             "Solicitante": nombre_solicitante,
                             "Cédula Solicitante": cedula_solicitante,
-                            "Tipo Solicitante": subtipo,
-                            "Área de Trabajo": area_trabajo,
-                            "Nombre de Comuna": nombre_comuna,
-                            "Código SITUR": codigo_situr,
-                            "Tipo de Solicitud": "Incorporación",
+                            "Cargo Solicitante": cargo_solicitante,
+                            "Área Origen": datos_usuario["area_origen"],
+                            "Área Destino": area_destino,
+                            "Tipo de Solicitud": tipo_solicitud,
                             "Estado Geográfico": estado_vzla,
-                            "Saliente Nombre": "N/A",
-                            "Saliente Apellido": "N/A",
-                            "Saliente Cédula": "N/A",
-                            "Motivo": "Incorporación",
-                            "Detalle Motivo": "N/A",
-                            "Entrante Nombre": p_nombre,
-                            "Entrante Apellido": p_apellido,
-                            "Entrante Cédula": p_cedula,
-                            "Profesión": p_profesion,
-                            "Grado Instrucción": p_grado,
-                            "Entrante Correo": "N/A",
-                            "Nuevo Rol": "N/A",
+                            "Saliente Nombre": p_nombre if tipo_solicitud in ["Desincorporación", "Cambio de rol"] else "N/A",
+                            "Saliente Apellido": p_apellido if tipo_solicitud in ["Desincorporación", "Cambio de rol"] else "N/A",
+                            "Saliente Cédula": p_cedula if tipo_solicitud in ["Desincorporación", "Cambio de rol"] else "N/A",
+                            "Motivo": tipo_solicitud,
+                            "Detalle Motivo": observaciones,
+                            "Entrante Nombre": p_nombre if tipo_solicitud == "Incorporación" else "N/A",
+                            "Entrante Apellido": p_apellido if tipo_solicitud == "Incorporación" else "N/A",
+                            "Entrante Cédula": p_cedula if tipo_solicitud == "Incorporación" else "N/A",
+                            "Entrante Profesión": "N/A",
+                            "Entrante Grado Instrucción": "N/A",
+                            "Entrante Correo": p_correo if p_correo else "N/A",
+                            "Cargo Actual": cargo_actual if cargo_actual else "N/A",
+                            "Cargo Nuevo": cargo_nuevo if cargo_nuevo else "N/A",
+                            "Observaciones": observaciones,
                             "Estado": "Pendiente"
                         }
                         guardar_nueva_solicitud(nueva_solicitud)
-                    st.success(f"✅ ¡Solicitud de Incorporación #{nuevo_id} enviada exitosamente!")
-
-    # ==========================================
-    # FORMULARIO 3: DESINCORPORACIÓN
-    # ==========================================
-    elif tipo_solicitud == "Desincorporación":
-        st.subheader("📋 Formulario de Desincorporación")
-        
-        col_d1, col_d2 = st.columns([1, 2])
-        with col_d1:
-            motivo_desinc = st.selectbox("Motivo de desincorporación *", MOTIVOS_DESINCORPORACION)
-        with col_d2:
-            if motivo_desinc in ["Cese", "Otro"]:
-                detalle_desinc = st.text_input(f"Especifique el motivo ({motivo_desinc}) *", placeholder="Escriba el detalle aquí...")
-            else:
-                detalle_desinc = "N/A"
-                st.write("")
-                st.caption("Si selecciona 'Cese' u 'Otro', se habilitará un campo para detallar.")
-
-        with st.form("form_desincorporacion", clear_on_submit=True):
-            estado_vzla, nombre_solicitante, cedula_solicitante, area_trabajo, nombre_comuna, codigo_situr = renderizar_datos_solicitante(datos_usuario)
-
-            st.markdown("---")
-            st.markdown("#### 👤 Datos del Personal")
-            cp1, cp2 = st.columns(2)
-            with cp1:
-                p_nombre = st.text_input("Nombre *")
-                p_cedula = st.text_input("Cédula *")
-                p_grado = st.selectbox("Grado de Instrucción *", GRADOS_INSTRUCCION)
-            with cp2:
-                p_apellido = st.text_input("Apellido *")
-                p_profesion = st.text_input("Profesión *")
-
-            submitted_des = st.form_submit_button("Enviar Solicitud de Desincorporación", use_container_width=True)
-            if submitted_des:
-                ubicacion_ok = validar_datos_ubicacion(subtipo, area_trabajo, nombre_comuna, codigo_situr)
-                if motivo_desinc in ["Cese", "Otro"] and not detalle_desinc.strip():
-                    st.error(f"⚠️ Debe especificar el detalle para el motivo '{motivo_desinc}'.")
-                elif not all([nombre_solicitante, cedula_solicitante, ubicacion_ok, p_nombre, p_apellido, p_cedula, p_profesion]):
-                    st.error("⚠️ Complete todos los campos obligatorios marcados con (*).")
-                else:
-                    with st.spinner("Registrando desincorporación en Google Sheets..."):
-                        registros_actuales = cargar_datos()
-                        nuevo_id = max([int(r["ID"]) for r in registros_actuales if str(r.get("ID", "")).isdigit()], default=0) + 1
-                        
-                        nueva_solicitud = {
-                            "ID": nuevo_id,
-                            "Fecha": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "Solicitante": nombre_solicitante,
-                            "Cédula Solicitante": cedula_solicitante,
-                            "Tipo Solicitante": subtipo,
-                            "Área de Trabajo": area_trabajo,
-                            "Nombre de Comuna": nombre_comuna,
-                            "Código SITUR": codigo_situr,
-                            "Tipo de Solicitud": "Desincorporación",
-                            "Estado Geográfico": estado_vzla,
-                            "Saliente Nombre": p_nombre,
-                            "Saliente Apellido": p_apellido,
-                            "Saliente Cédula": p_cedula,
-                            "Motivo": motivo_desinc,
-                            "Detalle Motivo": detalle_desinc if motivo_desinc in ["Cese", "Otro"] else "N/A",
-                            "Entrante Nombre": "N/A",
-                            "Entrante Apellido": "N/A",
-                            "Entrante Cédula": "N/A",
-                            "Profesión": p_profesion,
-                            "Grado Instrucción": p_grado,
-                            "Entrante Correo": "N/A",
-                            "Nuevo Rol": "N/A",
-                            "Estado": "Pendiente"
-                        }
-                        guardar_nueva_solicitud(nueva_solicitud)
-                    st.success(f"✅ ¡Solicitud de Desincorporación #{nuevo_id} enviada exitosamente!")
-
-    # ==========================================
-    # FORMULARIO 4: CAMBIO DE ROL
-    # ==========================================
-    elif tipo_solicitud == "Cambio de rol":
-        st.subheader("📋 Formulario de Cambio de Rol")
-        with st.form("form_cambio_rol", clear_on_submit=True):
-            estado_vzla, nombre_solicitante, cedula_solicitante, area_trabajo, nombre_comuna, codigo_situr = renderizar_datos_solicitante(datos_usuario)
-
-            st.markdown("---")
-            st.markdown("#### 👤 Datos del Personal")
-            cp1, cp2 = st.columns(2)
-            with cp1:
-                p_nombre = st.text_input("Nombre *")
-                p_cedula = st.text_input("Cédula *")
-            with cp2:
-                p_apellido = st.text_input("Apellido *")
-                p_profesion = st.text_input("Profesión *")
-            
-            nuevo_rol = st.selectbox("Rol Asignado *", ROLES_CAMBIO)
-
-            submitted_rol = st.form_submit_button("Enviar Solicitud de Cambio de Rol", use_container_width=True)
-            if submitted_rol:
-                ubicacion_ok = validar_datos_ubicacion(subtipo, area_trabajo, nombre_comuna, codigo_situr)
-                if not all([nombre_solicitante, cedula_solicitante, ubicacion_ok, p_nombre, p_apellido, p_cedula, p_profesion]):
-                    st.error("⚠️ Complete todos los campos obligatorios marcados con (*).")
-                else:
-                    with st.spinner("Registrando cambio de rol en Google Sheets..."):
-                        registros_actuales = cargar_datos()
-                        nuevo_id = max([int(r["ID"]) for r in registros_actuales if str(r.get("ID", "")).isdigit()], default=0) + 1
-                        
-                        nueva_solicitud = {
-                            "ID": nuevo_id,
-                            "Fecha": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "Solicitante": nombre_solicitante,
-                            "Cédula Solicitante": cedula_solicitante,
-                            "Tipo Solicitante": subtipo,
-                            "Área de Trabajo": area_trabajo,
-                            "Nombre de Comuna": nombre_comuna,
-                            "Código SITUR": codigo_situr,
-                            "Tipo de Solicitud": "Cambio de rol",
-                            "Estado Geográfico": estado_vzla,
-                            "Saliente Nombre": p_nombre,
-                            "Saliente Apellido": p_apellido,
-                            "Saliente Cédula": p_cedula,
-                            "Motivo": "Cambio de rol",
-                            "Detalle Motivo": "N/A",
-                            "Entrante Nombre": "N/A",
-                            "Entrante Apellido": "N/A",
-                            "Entrante Cédula": "N/A",
-                            "Profesión": p_profesion,
-                            "Grado Instrucción": "N/A",
-                            "Entrante Correo": "N/A",
-                            "Nuevo Rol": nuevo_rol,
-                            "Estado": "Pendiente"
-                        }
-                        guardar_nueva_solicitud(nueva_solicitud)
-                    st.success(f"✅ ¡Solicitud de Cambio de Rol #{nuevo_id} enviada exitosamente!")
+                    st.success(f"✅ ¡Solicitud #{nuevo_id} de {tipo_solicitud} enviada exitosamente!")
 
 # --- VISTA 2: RESPONSABLE DE ÁREA (BANDEJA Y GRÁFICAS) ---
 def vista_responsable(datos_usuario):
@@ -509,7 +379,7 @@ def vista_responsable(datos_usuario):
     
     col_top1, col_top2 = st.columns([3, 1])
     with col_top1:
-        ver_todas = st.checkbox("Ver todas las solicitudes registradas (Vista General)", value=True)
+        ver_todas = st.checkbox("Ver solicitudes de todas las áreas (Vista Consolidada)", value=False)
     with col_top2:
         if st.button("🔄 Actualizar Datos", use_container_width=True):
             st.rerun()
@@ -525,11 +395,10 @@ def vista_responsable(datos_usuario):
     if ver_todas:
         df_area = df_total.copy()
     else:
-        col_filtro = "Área de Trabajo" if "Área de Trabajo" in df_total.columns else "Tipo Solicitante"
-        df_area = df_total[df_total[col_filtro].astype(str).str.contains(area_resp, case=False, na=False)].copy()
+        df_area = df_total[df_total["Área Destino"] == area_resp].copy()
 
     if df_area.empty:
-        st.warning("No hay solicitudes que coincidan con el filtro actual.")
+        st.warning(f"No hay solicitudes dirigidas a **{area_resp}** en este momento.")
         return
 
     tab_bandeja, tab_graficas = st.tabs(["📥 Bandeja de Solicitudes y Gestión", "📈 Estadísticas y Gráficas"])
@@ -636,17 +505,12 @@ else:
         if user["rol"] == "responsable":
             st.caption(f"Área: {user['area_asignada']}")
         else:
-            st.caption(f"Perfil: {user.get('subtipo', '')}")
+            st.caption(f"Origen: {user['area_origen']}")
             
         st.markdown("---")
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.usuario_actual = None
             st.rerun()
-
-    if user["rol"] == "solicitante":
-        vista_solicitante(user)
-    elif user["rol"] == "responsable":
-        vista_responsable(user)
 
     if user["rol"] == "solicitante":
         vista_solicitante(user)
