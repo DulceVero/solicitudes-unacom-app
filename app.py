@@ -164,7 +164,7 @@ def renderizar_datos_solicitante(datos_usuario):
         estado_vzla = st.selectbox("Estado *", ESTADOS_VENEZUELA)
         nombre_solicitante = st.text_input("Nombre y Apellido del Solicitante *", value=datos_usuario["nombre"])
     with c_g2:
-        cedula_solicitante = st.text_input("Cédula del Solicitante *", placeholder="Ej. V-12345678")
+        cedula_solicitante = st.number_input("Cédula del Solicitante *", placeholder="Ej. V-12345678")
         if subtipo in ["UTL", "PNF"]:
             area_trabajo = st.text_input("Área de Trabajo *", placeholder="Escriba su área de trabajo")
         else:
@@ -263,7 +263,7 @@ def vista_solicitante(datos_usuario):
             with c_sal2:
                 sal_apellido = st.text_input("Apellido (Saliente) *")
             with c_sal3:
-                sal_cedula = st.text_input("Cédula (Saliente) *")
+                sal_cedula = st.number_input("Cédula (Saliente) *")
 
             st.markdown("---")
             st.markdown("#### 🆕 Datos del Personal Entrante")
@@ -275,8 +275,8 @@ def vista_solicitante(datos_usuario):
                 ent_apellido = st.text_input("Apellido (Entrante) *")
                 ent_grado = st.selectbox("Grado de Instrucción *", GRADOS_INSTRUCCION)
             with c_ent3:
-                ent_cedula = st.text_input("Cédula (Entrante) *")
-                ent_correo = st.text_input("Correo Electrónico *", placeholder="ejemplo@correo.com")
+                ent_cedula = st.number_input("Cédula (Entrante) *")
+                ent_correo = st.text_input("Correo Electrónico *", placeholder="ejemplo@correo.com", type="email")
 
             st.warning("📌 **Recordatorio:** Enviar la solicitud escrita y documentos del personal entrante")
 
@@ -339,7 +339,7 @@ def vista_solicitante(datos_usuario):
             cp1, cp2 = st.columns(2)
             with cp1:
                 p_nombre = st.text_input("Nombre *")
-                p_cedula = st.text_input("Cédula *")
+                p_cedula = st.number_input("Cédula *")
                 p_grado = st.selectbox("Grado de Instrucción *", GRADOS_INSTRUCCION)
             with cp2:
                 p_apellido = st.text_input("Apellido *")
@@ -408,7 +408,7 @@ def vista_solicitante(datos_usuario):
             cp1, cp2 = st.columns(2)
             with cp1:
                 p_nombre = st.text_input("Nombre *")
-                p_cedula = st.text_input("Cédula *")
+                p_cedula = st.number_input("Cédula *")
                 p_grado = st.selectbox("Grado de Instrucción *", GRADOS_INSTRUCCION)
             with cp2:
                 p_apellido = st.text_input("Apellido *")
@@ -467,7 +467,7 @@ def vista_solicitante(datos_usuario):
             cp1, cp2 = st.columns(2)
             with cp1:
                 p_nombre = st.text_input("Nombre *")
-                p_cedula = st.text_input("Cédula *")
+                p_cedula = st.number_input("Cédula *")
             with cp2:
                 p_apellido = st.text_input("Apellido *")
                 p_profesion = st.text_input("Profesión *")
