@@ -13,17 +13,29 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- ESTILO CSS PARA ENCABEZADOS DE TABLAS (AZUL CLARO Y NEGRITA) ---
+# --- ESTILO NATIVO PARA GLIDE DATA GRID (CANVAS DE STREAMLIT) ---
+# Funciona tanto en Dark Mode como en Light Mode
 st.markdown("""
 <style>
-    /* Estilo para encabezados de st.dataframe y st.data_editor */
-    [data-testid="stDataFrame"] th,
-    [data-testid="stDataEditor"] th,
-    .stDataFrame thead tr th {
-        background-color: #D6EAF8 !important;
-        color: #1B4F72 !important;
-        font-weight: 800 !important;
-        border-bottom: 2px solid #85C1E9 !important;
+    /* Variables internas que controlan el canvas de st.data_editor y st.dataframe */
+    [data-testid="stDataFrame"],
+    [data-testid="stDataEditor"],
+    .stDataFrame,
+    div[data-testid="stDataFrameResizable"] {
+        --gdg-bg-header: #D6EAF8 !important;
+        --gdg-bg-header-has-focus: #AED6F1 !important;
+        --gdg-bg-header-hovered: #AED6F1 !important;
+        --gdg-text-header: #154360 !important;
+        --gdg-header-font-style: 800 14px !important;
+        --gdg-border-color: #85C1E9 !important;
+    }
+
+    /* Respaldo para elementos DOM internos */
+    [data-testid="stDataFrame"] *,
+    [data-testid="stDataEditor"] * {
+        --gdg-bg-header: #D6EAF8 !important;
+        --gdg-text-header: #154360 !important;
+        --gdg-header-font-style: bold 14px !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -130,7 +142,6 @@ def cargar_datos():
             for col in COLUMNAS_ESPERADAS:
                 if col not in df.columns:
                     df[col] = "Pendiente" if col == "Status" else "N/A"
-            # Normalizar valores vacíos en Status
             df["Status"] = df["Status"].replace(["", "N/A", None], "Pendiente").fillna("Pendiente")
             df = df[COLUMNAS_ESPERADAS]
             return df.to_dict(orient="records")
@@ -590,12 +601,10 @@ def renderizar_tabla_gestionable(df_vista, columnas_visibles, key_editor):
     
     df_mostrar = df_vista[columnas_visibles].copy()
     
-    # Aseguramos que todos los valores de Status sean válidos para el desplegable
     df_mostrar["Status"] = df_mostrar["Status"].apply(
         lambda x: x if x in STATUS_SOLICITUD else "Pendiente"
     )
 
-    # Columnas bloqueadas (todas excepto 'Status')
     columnas_bloqueadas = [col for col in columnas_visibles if col != "Status"]
 
     df_editado = st.data_editor(
@@ -616,7 +625,6 @@ def renderizar_tabla_gestionable(df_vista, columnas_visibles, key_editor):
         key=key_editor
     )
 
-    # Detectar cambios en la columna 'Status'
     cambios = {}
     for idx in range(len(df_mostrar)):
         status_original = df_mostrar.iloc[idx]["Status"]
@@ -667,7 +675,6 @@ def vista_responsable(datos_usuario):
         st.warning(f"No hay solicitudes registradas para el área **{area_resp}** en este momento.")
         return
 
-    # Seleccionar columnas específicas del formulario según el área
     columnas_area = COLUMNAS_FORMADOR if area_resp == "Formador" else COLUMNAS_UTL_PNF
 
     tab_bandeja, tab_graficas = st.tabs(["📥 Bandeja de Solicitudes y Gestión", "📈 Estadísticas y Gráficas"])
