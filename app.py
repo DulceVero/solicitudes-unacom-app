@@ -9,7 +9,6 @@ from datetime import datetime
 # Configuración de página
 st.set_page_config(
     page_title="Gestión de Movimientos de Personal",
-    page_icon="📋",
     layout="wide"
 )
 
@@ -246,7 +245,7 @@ def validar_datos_ubicacion(subtipo, area_trabajo, nombre_comuna, codigo_situr):
 
 # --- FUNCIÓN DE LOGIN (SIN CREDENCIALES DE PRUEBA) ---
 def pantalla_login():
-    st.title("🔐 Control de Movimientos de Plantilla")
+    st.title("Control de Movimientos de Plantilla")
     st.markdown("Ingrese sus credenciales para acceder al módulo correspondiente a su perfil.")
 
     col1, col2, col3 = st.columns([1, 1.5, 1])
@@ -267,7 +266,7 @@ def pantalla_login():
 # --- VISTA 1: SOLICITANTE (FORMULARIO DINÁMICO) ---
 def vista_solicitante(datos_usuario):
     subtipo = datos_usuario.get("subtipo", "UTL")
-    st.header("📝 Solicitud de Movimiento de Personal")
+    st.header("Solicitud de Movimiento de Personal")
     st.info(f"Conectado como: **{datos_usuario['nombre']}** | Perfil: **{subtipo}**")
 
     st.subheader("1. Seleccione el Tipo de Solicitud")
@@ -283,7 +282,7 @@ def vista_solicitante(datos_usuario):
     # FORMULARIO 1: SUSTITUCIÓN
     # ==========================================
     if tipo_solicitud == "Sustitución":
-        st.subheader("📋 Formulario de Sustitución")
+        st.subheader("Formulario de Sustitución")
 
         col_m1, col_m2 = st.columns([1, 2])
         with col_m1:
@@ -300,7 +299,7 @@ def vista_solicitante(datos_usuario):
             estado_vzla, nombre_solicitante, cedula_solicitante, area_trabajo, nombre_comuna, codigo_situr = renderizar_datos_solicitante(datos_usuario)
 
             st.markdown("---")
-            st.markdown("#### 👤 Datos del Personal Saliente")
+            st.markdown("#### Datos del Personal Saliente")
             c_sal1, c_sal2, c_sal3 = st.columns(3)
             with c_sal1:
                 sal_nombre = st.text_input("Nombre (Saliente) *")
@@ -310,7 +309,7 @@ def vista_solicitante(datos_usuario):
                 sal_cedula = st.number_input("Cédula (Saliente) *", min_value=0, step=1, format="%d")
 
             st.markdown("---")
-            st.markdown("#### 🆕 Datos del Personal Entrante")
+            st.markdown("#### Datos del Personal Entrante")
             c_ent1, c_ent2, c_ent3 = st.columns(3)
             with c_ent1:
                 ent_nombre = st.text_input("Nombre (Entrante) *")
@@ -341,7 +340,7 @@ def vista_solicitante(datos_usuario):
                 elif not cedulas_validas:
                     st.error("⚠️ Todas las cédulas deben ser mayores a 0.")
                 elif not es_correo_valido(ent_correo):
-                    st.error("⚠️ Ingrese un correo electrónico válido (ejemplo@dominio.com).")
+                    st.error("⚠️ Ingrese un correo electrónico válido (ejemplo@gmail.com).")
                 else:
                     with st.spinner("Registrando sustitución en Google Sheets..."):
                         registros_actuales = cargar_datos()
@@ -384,7 +383,7 @@ def vista_solicitante(datos_usuario):
             estado_vzla, nombre_solicitante, cedula_solicitante, area_trabajo, nombre_comuna, codigo_situr = renderizar_datos_solicitante(datos_usuario)
 
             st.markdown("---")
-            st.markdown("#### 👤 Datos del Personal")
+            st.markdown("#### Datos del Personal")
             cp1, cp2 = st.columns(2)
             with cp1:
                 p_nombre = st.text_input("Nombre *")
@@ -438,7 +437,7 @@ def vista_solicitante(datos_usuario):
     # FORMULARIO 3: DESINCORPORACIÓN
     # ==========================================
     elif tipo_solicitud == "Desincorporación":
-        st.subheader("📋 Formulario de Desincorporación")
+        st.subheader("Formulario de Desincorporación")
 
         col_d1, col_d2 = st.columns([1, 2])
         with col_d1:
@@ -455,7 +454,7 @@ def vista_solicitante(datos_usuario):
             estado_vzla, nombre_solicitante, cedula_solicitante, area_trabajo, nombre_comuna, codigo_situr = renderizar_datos_solicitante(datos_usuario)
 
             st.markdown("---")
-            st.markdown("#### 👤 Datos del Personal")
+            st.markdown("#### Datos del Personal")
             cp1, cp2 = st.columns(2)
             with cp1:
                 p_nombre = st.text_input("Nombre *")
@@ -511,12 +510,12 @@ def vista_solicitante(datos_usuario):
     # FORMULARIO 4: CAMBIO DE ROL
     # ==========================================
     elif tipo_solicitud == "Cambio de rol":
-        st.subheader("📋 Formulario de Cambio de Rol")
+        st.subheader("Formulario de Cambio de Rol")
         with st.form("form_cambio_rol", clear_on_submit=True):
             estado_vzla, nombre_solicitante, cedula_solicitante, area_trabajo, nombre_comuna, codigo_situr = renderizar_datos_solicitante(datos_usuario)
 
             st.markdown("---")
-            st.markdown("#### 👤 Datos del Personal")
+            st.markdown("#### Datos del Personal")
             cp1, cp2 = st.columns(2)
             with cp1:
                 p_nombre = st.text_input("Nombre *")
@@ -569,7 +568,7 @@ def vista_solicitante(datos_usuario):
 
 # --- FUNCIÓN COMPARTIDA PARA TABLA INTERACTIVA CON st.data_editor (SOLO STATUS EDITABLE) ---
 def renderizar_tabla_gestionable(df_vista, columnas_visibles, key_editor):
-    st.caption("💡 **Tip:** Haga clic en la columna **Status** de cualquier fila para cambiar su valor directamente, luego presione **💾 Guardar Cambios de Status**.")
+    st.caption("💡 **Tip:** Haga clic en la columna **Status** de cualquier fila para cambiar su valor directamente, luego presione **Guardar Cambios de Status**.")
     
     df_mostrar = df_vista[columnas_visibles].copy()
     
@@ -608,7 +607,7 @@ def renderizar_tabla_gestionable(df_vista, columnas_visibles, key_editor):
 
     col_btn1, col_btn2 = st.columns([1, 3])
     with col_btn1:
-        if st.button("💾 Guardar Cambios de Status", key=f"btn_{key_editor}", use_container_width=True, type="primary"):
+        if st.button("Guardar Cambios de Status", key=f"btn_{key_editor}", use_container_width=True, type="primary"):
             if cambios:
                 with st.spinner("Guardando cambios en Google Sheets..."):
                     actualizar_multiples_status_en_sheets(cambios)
@@ -623,11 +622,11 @@ def vista_responsable(datos_usuario):
 
     col_top1, col_top2 = st.columns([4, 1])
     with col_top1:
-        st.header(f"📊 Panel de Control: Área {area_resp}")
+        st.header(f"Panel de Control: Área {area_resp}")
         st.caption(f"Mostrando exclusivamente solicitudes emitidas por el perfil **{area_resp}**.")
     with col_top2:
         st.write("")
-        if st.button("🔄 Actualizar Datos", use_container_width=True):
+        if st.button("Actualizar Datos", use_container_width=True):
             st.rerun()
 
     registros = cargar_datos()
@@ -650,7 +649,7 @@ def vista_responsable(datos_usuario):
 
     columnas_area = COLUMNAS_FORMADOR if area_resp == "Formador" else COLUMNAS_UTL_PNF
 
-    tab_bandeja, tab_graficas = st.tabs(["📥 Bandeja de Solicitudes y Gestión", "📈 Estadísticas y Gráficas"])
+    tab_bandeja, tab_graficas = st.tabs(["Bandeja de Solicitudes y Gestión", "Estadísticas y Gráficas"])
 
     with tab_bandeja:
         st.subheader("Filtros de Búsqueda")
@@ -738,11 +737,11 @@ def vista_responsable(datos_usuario):
 def vista_consolidada(datos_usuario):
     col_top1, col_top2 = st.columns([4, 1])
     with col_top1:
-        st.header("🌐 Tablero Consolidado General de Movimientos")
+        st.header("Tablero Consolidado General de Movimientos")
         st.caption("Vista global de solicitudes emitidas por **UTL**, **Formador** y **PNF**.")
     with col_top2:
         st.write("")
-        if st.button("🔄 Actualizar Datos", use_container_width=True):
+        if st.button("Actualizar Datos", use_container_width=True):
             st.rerun()
 
     registros = cargar_datos()
@@ -753,7 +752,7 @@ def vista_consolidada(datos_usuario):
 
     df_total = pd.DataFrame(registros)
 
-    tab_bandeja, tab_graficas = st.tabs(["📥 Bandeja Consolidada", "📈 Gráficas e Indicadores Globales"])
+    tab_bandeja, tab_graficas = st.tabs(["📥 Bandeja Consolidada", "Gráficas e Indicadores Globales"])
 
     with tab_bandeja:
         st.subheader("Filtros de Búsqueda")
@@ -891,7 +890,7 @@ else:
     user = st.session_state.usuario_actual
 
     with st.sidebar:
-        st.markdown(f"### 👤 {user['nombre']}")
+        st.markdown(f"### {user['nombre']}")
         st.caption(f"Rol: **{user['rol'].upper()}**")
         if user["rol"] in ["responsable", "consolidado"]:
             st.caption(f"Alcance: **{user['area_asignada']}**")
@@ -899,7 +898,7 @@ else:
             st.caption(f"Perfil: **{user.get('subtipo', '')}**")
 
         st.markdown("---")
-        if st.button("🚪 Cerrar Sesión", use_container_width=True):
+        if st.button("↩Cerrar Sesión", use_container_width=True):
             st.session_state.usuario_actual = None
             st.rerun()
 
