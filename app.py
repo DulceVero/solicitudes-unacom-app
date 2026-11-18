@@ -15,7 +15,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- ESTILO CSS PERSONALIZADO PARA ENCABEZADOS DE TABLAS Y LOGO ---
+# --- ESTILO CSS PERSONALIZADO ---
 st.markdown("""
 <style>
     /* Forzar fondo azul claro y letras en negrita en los encabezados de las tablas */
@@ -42,6 +42,36 @@ st.markdown("""
         height: 62px;
         width: auto;
         display: block;
+    }
+
+    /* Opciones del radio de Tipo de Solicitud más grandes y en negrita */
+    div[data-testid="stRadio"] > div[role="radiogroup"] label p {
+        font-size: 18px !important;
+        font-weight: 800 !important;
+    }
+
+    /* Botones principales (Enviar Solicitud y Guardar Cambios de Status) en #FFC53D con sombreado y negrita */
+    div[data-testid="stFormSubmitButton"] button,
+    div[data-testid="stButton"] button[kind="primary"] {
+        background-color: #FFC53D !important;
+        color: #1C2833 !important;
+        border: 1.5px solid #D4A017 !important;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25) !important;
+        border-radius: 8px !important;
+        transition: all 0.2s ease-in-out !important;
+    }
+    div[data-testid="stFormSubmitButton"] button p,
+    div[data-testid="stButton"] button[kind="primary"] p {
+        font-weight: 800 !important;
+        font-size: 15.5px !important;
+        color: #1C2833 !important;
+    }
+    div[data-testid="stFormSubmitButton"] button:hover,
+    div[data-testid="stButton"] button[kind="primary"]:hover {
+        background-color: #FFB703 !important;
+        border-color: #B7950B !important;
+        box-shadow: 0 6px 14px rgba(255, 197, 61, 0.45) !important;
+        transform: translateY(-1px);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -352,7 +382,8 @@ def vista_solicitante(datos_usuario):
                 ent_cedula = st.number_input("Cédula (Entrante) *", min_value=0, step=1, format="%d")
                 ent_correo = st.text_input("Correo Electrónico *", placeholder="ejemplo@correo.com")
 
-            st.warning("📌 **Recordatorio:** Enviar la solicitud escrita y documentos del personal entrante")
+            # Alerta roja llamativa para que el solicitante no pase por alto el recordatorio
+            st.error("🚨 **RECORDATORIO OBLIGATORIO:** Enviar la solicitud escrita y documentos del personal entrante")
 
             submitted = st.form_submit_button("Enviar Solicitud de Sustitución", use_container_width=True)
 
@@ -635,7 +666,7 @@ def renderizar_tabla_gestionable(df_vista, columnas_visibles, key_editor):
         if status_original != status_nuevo:
             cambios[sol_id] = status_nuevo
 
-    col_btn1, col_btn2 = st.columns([1, 3])
+    col_btn1, col_btn2 = st.columns([1.2, 3])
     with col_btn1:
         if st.button("💾 Guardar Cambios de Status", key=f"btn_{key_editor}", use_container_width=True, type="primary"):
             if cambios:
