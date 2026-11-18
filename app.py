@@ -898,7 +898,7 @@ else:
             st.caption(f"Perfil: **{user.get('subtipo', '')}**")
 
         st.markdown("---")
-        if st.button("↩Cerrar Sesión", use_container_width=True):
+        if st.button("↩ Cerrar Sesión", use_container_width=True):
             st.session_state.usuario_actual = None
             st.rerun()
 
