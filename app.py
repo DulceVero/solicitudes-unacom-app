@@ -378,7 +378,7 @@ def vista_solicitante(datos_usuario):
     # FORMULARIO 2: INCORPORACIÓN
     # ==========================================
     elif tipo_solicitud == "Incorporación":
-        st.subheader("📋 Formulario de Incorporación")
+        st.subheader("Formulario de Incorporación")
         with st.form("form_incorporacion", clear_on_submit=True):
             estado_vzla, nombre_solicitante, cedula_solicitante, area_trabajo, nombre_comuna, codigo_situr = renderizar_datos_solicitante(datos_usuario)
 
@@ -568,7 +568,7 @@ def vista_solicitante(datos_usuario):
 
 # --- FUNCIÓN COMPARTIDA PARA TABLA INTERACTIVA CON st.data_editor (SOLO STATUS EDITABLE) ---
 def renderizar_tabla_gestionable(df_vista, columnas_visibles, key_editor):
-    st.caption("💡 **Tip:** Haga clic en la columna **Status** de cualquier fila para cambiar su valor directamente, luego presione **Guardar Cambios de Status**.")
+    st.caption("💡 Haga clic en la columna **Status** de cualquier fila para cambiar su valor directamente, luego presione **Guardar Cambios de Status**.")
     
     df_mostrar = df_vista[columnas_visibles].copy()
     
@@ -752,7 +752,7 @@ def vista_consolidada(datos_usuario):
 
     df_total = pd.DataFrame(registros)
 
-    tab_bandeja, tab_graficas = st.tabs(["📥 Bandeja Consolidada", "Gráficas e Indicadores Globales"])
+    tab_bandeja, tab_graficas = st.tabs([" Bandeja Consolidada", "Gráficas e Indicadores Globales"])
 
     with tab_bandeja:
         st.subheader("Filtros de Búsqueda")
