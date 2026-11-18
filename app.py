@@ -244,7 +244,7 @@ def validar_datos_ubicacion(subtipo, area_trabajo, nombre_comuna, codigo_situr):
             codigo_situr and codigo_situr.strip() and codigo_situr != "N/A"
         )
 
-# --- FUNCIÓN DE LOGIN ---
+# --- FUNCIÓN DE LOGIN (SIN CREDENCIALES DE PRUEBA) ---
 def pantalla_login():
     st.title("🔐 Control de Movimientos de Plantilla")
     st.markdown("Ingrese sus credenciales para acceder al módulo correspondiente a su perfil.")
@@ -263,22 +263,6 @@ def pantalla_login():
                     st.rerun()
                 else:
                     st.error("Usuario o contraseña incorrectos.")
-
-        with st.expander("ℹ️ Credenciales de Prueba"):
-            st.markdown("""
-            **Usuarios Solicitantes (Solo Formulario):**
-            - UTL: `utl_user` | Contraseña: `123`
-            - PNF: `pnf_user` | Contraseña: `123`
-            - Formador: `formador_user` | Contraseña: `123`
-
-            **Administradores por Área:**
-            - Admin UTL: `admin_utl` | Contraseña: `admin`
-            - Admin Formador: `admin_formador` | Contraseña: `admin`
-            - Admin PNF: `admin_pnf` | Contraseña: `admin`
-
-            **Vista Consolidada General (Todas las áreas):**
-            - Admin General: `admin_general` | Contraseña: `admin`
-            """)
 
 # --- VISTA 1: SOLICITANTE (FORMULARIO DINÁMICO) ---
 def vista_solicitante(datos_usuario):
