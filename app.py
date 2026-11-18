@@ -50,9 +50,10 @@ st.markdown("""
         font-weight: 800 !important;
     }
 
-    /* Botones principales (Enviar Solicitud y Guardar Cambios de Status) en #FFC53D con sombreado y negrita */
+    /* Botones principales (Enviar Solicitud, Guardar Cambios de Status y Cerrar Sesión) en #FFC53D con sombreado y negrita */
     div[data-testid="stFormSubmitButton"] button,
-    div[data-testid="stButton"] button[kind="primary"] {
+    div[data-testid="stButton"] button[kind="primary"],
+    div[data-testid="stSidebar"] div[data-testid="stButton"] button {
         background-color: #FFC53D !important;
         color: #1C2833 !important;
         border: 1.5px solid #D4A017 !important;
@@ -61,13 +62,15 @@ st.markdown("""
         transition: all 0.2s ease-in-out !important;
     }
     div[data-testid="stFormSubmitButton"] button p,
-    div[data-testid="stButton"] button[kind="primary"] p {
+    div[data-testid="stButton"] button[kind="primary"] p,
+    div[data-testid="stSidebar"] div[data-testid="stButton"] button p {
         font-weight: 800 !important;
         font-size: 15.5px !important;
         color: #1C2833 !important;
     }
     div[data-testid="stFormSubmitButton"] button:hover,
-    div[data-testid="stButton"] button[kind="primary"]:hover {
+    div[data-testid="stButton"] button[kind="primary"]:hover,
+    div[data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
         background-color: #FFB703 !important;
         border-color: #B7950B !important;
         box-shadow: 0 6px 14px rgba(255, 197, 61, 0.45) !important;
